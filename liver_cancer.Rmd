@@ -1,0 +1,258 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+### Load packages
+```{r}
+library(tximport)
+require(DESeq2)
+require(CePa)
+require(stringr)
+require(biomaRt)
+require(GEOmetadb)
+```
+
+
+
+### define functions
+```{r}
+
+# DE analysis
+DeAnalysis <- function(df, treatments){
+  coldata <- data.frame(condition = treatments)
+  rownames(coldata) <- colnames(df)
+  dds <- DESeqDataSetFromMatrix(countData = df,
+                                colData = coldata,
+                                design = ~ condition)
+  dds$condition <- relevel(dds$condition, ref="control")
+#pre-filter
+  dds <- dds[rowSums(counts(dds)) > 1,]
+
+#calculate the factor2
+  dds <- estimateSizeFactors(dds)
+
+#DE africa
+  dds <- DESeq(dds)
+  res <- results(dds, contrast=c("condition","cancer","control"))
+  res.ordered <- res[order(res$padj),]
+  return(res.ordered)
+}
+
+
+# get differential expressed genes with a padj cut-off from de output
+GetDEG <- function(de.result, padj.cut.off = 1e-2){
+    res.sig <- subset(de.result, padj < padj.cut.off)
+    return(rownames(res.sig))
+}
+
+```
+
+
+# Load data
+```{r}
+data.tmp <- read.table("data/gdac.broadinstitute.org_LIHC.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes_normalized__data.Level_3.2016012800.0.0/LIHC.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes_normalized__data.data.txt", stringsAsFactors = F, sep = "\t", header = T, row.names = 1)
+colnames(data.tmp) <- gsub("\\.", "-", colnames(data.tmp))
+
+sample.name.cancer <- read.table("data/sample.name.txt", sep= "\t", stringsAsFactors = F)
+sample.name.cancer  <- unique(sample.name.cancer$V1)
+
+sample.name.ct <- read.table("data/sample.name_control.txt", sep= "\t", stringsAsFactors = F)
+sample.name.ct <- unique(sample.name.ct$V1)
+
+sample.name.re <- colnames(data.tmp)[intersect(which(!colnames(data.tmp) %in% sample.name.cancer), which(!colnames(data.tmp) %in% sample.name.ct))]
+
+data.tmp <- data.tmp[-1,]
+
+data.mat <- as.matrix(data.tmp)
+data.mat <- apply(data.mat, 2, as.numeric)
+
+# round to integer
+data.mat.round <- as.data.frame(round(data.mat, 0))
+
+
+# get the label
+
+cancer.index <- which(colnames(data.mat.round) %in% sample.name.cancer)
+control.index <- which(colnames(data.mat.round) %in% sample.name.ct)
+sample.index <- c(cancer.index, control.index)
+
+# final dataset
+df.final <- data.mat.round[,sample.index]
+
+
+rownames(df.final) <- rownames(data.tmp)
+tmp <- rownames(df.final)
+
+for (i in 1:nrow(df.final)){
+  row.names(df.final)[i] <- str_match(tmp[i], "\\|([0-9]+)")[2]
+}
+
+
+
+label.vec <- c(rep("cancer", length(sample.name.cancer)), rep("control", length(sample.name.ct)))
+
+
+
+```
+
+
+# CCLE
+
+```{r}
+ccle.raw <- read.gct("data/CCLE_RNAseq_081117.rpkm.gct")
+ccle.hcc.name <- read.table("data/ccle_name_hcc.txt", stringsAsFactors = FALSE, sep = "\t")
+ccle.hcc.name <- ccle.hcc.name$V1
+
+ccle.hcc <- ccle.raw[,which(colnames(ccle.raw) %in% ccle.hcc.name)]
+
+
+
+
+
+
+
+
+# remove the dot
+tmp <- rownames(ccle.raw)
+tmp.new <- tmp
+ccle.num <- nrow(ccle.raw)
+for (i in 1:ccle.num){
+ tmp.new[i] <- str_match(tmp[i], "(.+)\\.")[2]
+}
+rownames(ccle.raw) <- tmp.new
+
+# Get the gene name table
+ensembl = useMart("ensembl", dataset = "hsapiens_gene_ensembl")
+gene.name.ccle <- getBM(attributes = c("entrezgene", "ensembl_gene_id", "hgnc_symbol", "affy_hg_u133_plus_2"),filters="ensembl_gene_id", values=rownames(ccle.raw), mart=ensembl)
+
+
+# map the emsemble to entrez id
+ccle.name.index.in.gene.name.table <- match(rownames(ccle.raw), gene.name.ccle$ensembl_gene_id)
+ccle.name.entrez <- gene.name.ccle$entrezgene[ccle.name.index.in.gene.name.table]
+
+ccle.raw.mapped <- ccle.raw[!is.na(ccle.name.entrez),]
+rownames(ccle.raw.mapped) <- gene.name.ccle$entrezgene[match(rownames(ccle.raw.mapped), gene.name.ccle$ensembl_gene_id)]
+
+
+# IQR
+ccle.raw.mapped <- ccle.raw.mapped[order(-apply(as.matrix(ccle.raw.mapped), 1, IQR)),]
+
+
+# top 5K variable genes based on IQR
+gene.top5k <- rownames(ccle.raw.mapped)[1:5000]
+gene.top5k.overlap <- intersect(gene.top5k, rownames(df.final))
+
+```
+
+
+
+
+### Find samples that correlate with cell lines
+```{r}
+ccle.top5k.hcc <- ccle.raw.mapped[which(rownames(ccle.raw.mapped) %in% gene.top5k.overlap),which(colnames(ccle.raw.mapped) %in% ccle.hcc.name)]
+
+ccle.top5k.other <- ccle.raw.mapped[which(rownames(ccle.raw.mapped) %in% gene.top5k.overlap),which(!colnames(ccle.raw.mapped) %in% ccle.hcc.name)]
+
+df.final.top5k <- df.final[which(rownames(df.final) %in% gene.top5k.overlap),]
+
+
+
+# check
+sum(duplicated(rownames(ccle.top5k.hcc)))
+
+# remove the 8 genes
+remove.gene.vec <- rownames(ccle.top5k.hcc)[which(duplicated(rownames(ccle.top5k.hcc)))]
+ccle.top5k.hcc <- ccle.top5k.hcc[which(!rownames(ccle.top5k.hcc) %in% remove.gene.vec),]
+ccle.top5k.other <- ccle.top5k.other[which(!rownames(ccle.top5k.other) %in% remove.gene.vec),]
+df.final.top5k <- df.final.top5k[which(!rownames(df.final.top5k) %in% remove.gene.vec),]
+
+# re-order the gene name
+ccle.top5k.hcc <- ccle.top5k.hcc[order(rownames(ccle.top5k.hcc)),]
+ccle.top5k.other <- ccle.top5k.other[order(rownames(ccle.top5k.other)),]
+df.final.top5k <- df.final.top5k[order(rownames(df.final.top5k)),]
+
+#cor between sample and HCC
+cor.hcc <- cor(df.final.top5k, ccle.top5k.hcc, method = "spearman")
+cor.other <- cor(df.final.top5k, ccle.top5k.other, method = "spearman")
+
+# calculate the p-value
+pvalue.vec <- c()
+for (i in 1:nrow(cor.hcc)){
+  pvalue.vec[i] <- (wilcox.test(cor.hcc[i,], cor.other[i,]))$p.value
+}
+
+```
+
+
+## download random tissue samples from Expression Project for Oncology (expO)
+```{r}
+#read in data
+expo.data <- read.table("data/GSE2109_series_matrix.txt", stringsAsFactors = F, header = T, comment.char = "!", row.names = 1)
+
+# transform the name into entrez
+expo.name.entrez <- gene.name.ccle$entrezgene[match(rownames(expo.data), gene.name.ccle$affy_hg_u133_plus_2)]
+
+# remove NA
+expo.data <- expo.data[!is.na(expo.name.entrez),]
+tmp.rowname <- expo.name.entrez[!is.na(expo.name.entrez)]
+rownames(expo.data) <- 
+
+# take random 1k samples
+set.seed(10)
+expo.data.1k <- expo.data[,sample(1:ncol(expo.data), size = 1000, replace = FALSE)]
+
+
+# use the top 5k gene
+expo.data.1k <- expo.data.1k[which(rownames(expo.data.1k) %in% rownames(ccle.top5k.hcc)),]
+
+
+# check
+sum(duplicated(rownames(expo.data.1k)))
+
+
+# re-order the gene name
+df.final.top5k <- df.final.top5k[order(rownames(df.final.top5k)),]
+
+#cor between sample and HCC
+cor.hcc <- cor(df.final.top5k, ccle.top5k.hcc, method = "spearman")
+cor.other <- cor(df.final.top5k, ccle.top5k.other, method = "spearman")
+
+# calculate the p-value
+pvalue.vec <- c()
+for (i in 1:nrow(cor.hcc)){
+  pvalue.vec[i] <- (wilcox.test(cor.hcc[i,], cor.other[i,]))$p.value
+}
+
+```
+
+
+
+### DE
+```{r}
+# DE
+de.output <- DeAnalysis(df = df.final, treatments = label.vec)
+
+
+coldata <- data.frame(condition = label.vec)
+rownames(coldata) <- colnames(df.final)
+dds <- DESeqDataSetFromMatrix(countData = df.final,
+                                colData = coldata,
+                                design = ~ condition)
+dds$condition <- relevel(dds$condition, ref="control")
+dds <- dds[rowSums(counts(dds)) > 1,]
+
+#calculate the factor2
+dds <- estimateSizeFactors(dds)
+
+#DE africa
+dds <- DESeq(dds)
+res <- results(dds, contrast=c("condition","cancer","control"))
+res.ordered <- res[order(res$padj),]
+  
+### Get deg
+deg.1em1 <- GetDEG(res.ordered, 1e-1)
+
+
+```
+
