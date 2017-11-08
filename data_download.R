@@ -1,6 +1,6 @@
 require(CePa)
-
-
+require(tidyverse)
+require(stringr)
 #download raw data from GDAC
 Download_GDAC <- function(tumor.name, path.to.folder){
   #STAD no rnaseq2
@@ -14,8 +14,11 @@ Download_GDAC <- function(tumor.name, path.to.folder){
     if (!file.exists(path.to.folder)){
       dir.create(path.to.folder)
     }
-    system(paste0('curl ', '-o ', path.to.folder, '/', tumor,  '.gdac.tar.gz ', url))
-    system(paste0('tar -zxvf ', path.to.folder, '/', tumor, '.gdac.tar.gz', ' -C ', path.to.folder))
+    if (!file.exists(paste0(path.to.folder, '/gdac.broadinstitute.org_', tumor, '.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2016012800.0.0/', tumor, '.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt'))){
+      system(paste0('curl ', '-o ', path.to.folder, '/', tumor,  '.gdac.tar.gz ', url))
+      system(paste0('tar -zxvf ', path.to.folder, '/', tumor, '.gdac.tar.gz', ' -C ', path.to.folder))
+    }
+
     df.tmp <- read.table(paste0(path.to.folder, '/gdac.broadinstitute.org_', tumor, '.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2016012800.0.0/', tumor, '.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt'), stringsAsFactors = F, sep = "\t", header = T, row.names = 1)
     colnames(df.tmp) <- gsub("\\.", "-", colnames(df.tmp))
     df.tmp <- df.tmp[-1,seq(1,ncol(df.tmp),3)]
@@ -39,8 +42,11 @@ Download_GEO <- function(geo.accs, path.to.folder){
     if (!file.exists(path.to.folder)){
       dir.create(path.to.folder)
     }
-    system(paste('curl ', url, ' -o ', path.to.folder, '/', geo_acc, '.txt.gz', sep = ""))
-    system(paste('gunzip ', path.to.folder, '/', geo_acc, '.txt.gz', sep = ""))
+
+    if (!file.exists(paste0(path.to.folder, "/", geo_acc, '.txt'))){
+      system(paste('curl ', url, ' -o ', path.to.folder, '/', geo_acc, '.txt.gz', sep = ""))
+      system(paste('gunzip ', path.to.folder, '/', geo_acc, '.txt.gz', sep = ""))
+    }
     df.tmp <- read.table(paste0(path.to.folder, "/", geo_acc, '.txt'), stringsAsFactors = F, sep = "\t", header = T, row.names = 1, comment.char = "!")
     geo.list[[paste0(geo_acc)]] <- df.tmp
   }
@@ -55,10 +61,14 @@ Download_GEO <- function(geo.accs, path.to.folder){
 #download raw data from CCLE RPKM
 Download_CCLE_RPKM <- function(path.to.folder){
   url = 'https://data.broadinstitute.org/ccle/CCLE_RNAseq_081117.rpkm.gct'
+
   if (!file.exists(path.to.folder)){
       dir.create(path.to.folder)
   }
-  system(paste('curl ', url, ' -o ', path.to.folder, '/ccle_rpkm.gct', sep = ""))
+
+  if (!file.exists(paste0(path.to.folder, "/ccle_rpkm.gct"))){
+    system(paste('curl ', url, ' -o ', path.to.folder, '/ccle_rpkm.gct', sep = ""))
+  }
   df.tmp <- read.gct(paste0(path.to.folder, "/ccle_rpkm.gct"))
   for (i in 1:nrow(df.tmp)){
    rownames(df.tmp)[i] <- str_match(rownames(df.tmp)[i], "(.+)\\.")[2]
@@ -74,7 +84,10 @@ Download_CCLE_Metadata <- function(path.to.folder){
   if (!file.exists(path.to.folder)){
       dir.create(path.to.folder)
   }
-  system(paste('curl ', url, ' -o ', path.to.folder, '/ccle_annotation.txt', sep = ""))
+  if (!file.exists(paste0(path.to.folder, "/ccle_annotation.txt"))){
+    system(paste('curl ', url, ' -o ', path.to.folder, '/ccle_annotation.txt', sep = ""))
+  }
+
   df.tmp <- read.table(paste0(path.to.folder, "/ccle_annotation.txt"), stringsAsFactors = F, sep = "\t", header = T, row.names = 1)
   return(df.tmp)
 }
