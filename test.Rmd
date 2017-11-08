@@ -1,0 +1,30 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+# download the data
+source("data_download.R")
+df.gdac <- Download_GDAC(tumor.name = "LIHC", path.to.folder = "~/Desktop")
+df.expo <- Download_GEO(geo.accs = 'GSE2109', path.to.folder = "~/Desktop")
+df.ccle <- Download_CCLE_RPKM(path.to.folder = "~/Desktop")
+df.ccle.metadata <- Download_CCLE_Metadata(path.to.folder = "~/Desktop")
+
+# map and aggregate
+source("data_combining.R")
+df.expo.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.expo, database.name = "EXPO")
+df.ccle.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.ccle, database.name = "CCLE")
+df.gdac.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.gdac, database.name = "GDAC")
+
+
+
+
+
+# toy example
+tmp <- tibble(a = c(1,2,3,4,5,6), b = c(1,1,2,2,3,3), c = c(1,2,3,4,5,6))
+
+
+
+```
+
