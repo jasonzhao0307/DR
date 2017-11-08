@@ -70,9 +70,12 @@ Download_CCLE_RPKM <- function(path.to.folder){
     system(paste('curl ', url, ' -o ', path.to.folder, '/ccle_rpkm.gct', sep = ""))
   }
   df.tmp <- read.gct(paste0(path.to.folder, "/ccle_rpkm.gct"))
-  for (i in 1:nrow(df.tmp)){
-   rownames(df.tmp)[i] <- str_match(rownames(df.tmp)[i], "(.+)\\.")[2]
+  print("read in finished!")
+  rowname.vec <- rownames(df.tmp)
+  for (i in 1:length(rowname.vec)){
+   rowname.vec[i] <- str_match(rowname.vec[i], "(.+)\\.")[2]
   }
+  rownames(df.tmp) <- rowname.vec
   return(df.tmp)
 }
 
