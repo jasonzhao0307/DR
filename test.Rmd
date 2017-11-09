@@ -16,7 +16,9 @@ save.image("../DR.RData")
 ```{r}
 # download the data
 source("data_download.R")
-df.gdac <- Download_GDAC(tumor.name = "LIHC", path.to.folder = "~/Desktop")
+list.df.gdac <- Download_GDAC(tumor.name = "LIHC", path.to.folder = "~/Desktop")
+df.gdac.metadata <- list.df.gdac$metadata
+df.gdac <- list.df.gdac$exp
 df.expo <- Download_GEO(geo.accs = 'GSE2109', path.to.folder = "~/Desktop")
 df.ccle <- Download_CCLE_RPKM(path.to.folder = "~/Desktop")
 df.ccle.metadata <- Download_CCLE_Metadata(path.to.folder = "~/Desktop")
