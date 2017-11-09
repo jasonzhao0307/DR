@@ -23,9 +23,9 @@ Map_Data_To_Unifying_Gene_Name <- function(df, database.name){
 
   # index of the original gene id
   index.original.gene <- which(colnames(gene.dict) == gene.name)
-
   # remove the rows with gene symbol empty
   gene.dict <- gene.dict[which(gene.dict$hgnc_symbol != "" & gene.dict$hgnc_symbol != "?"),]
+  #print(head(gene.dict))
 
   # update the df with only the rows having corresponding gene symbol
   df <- df[which(rownames(df) %in% gene.dict[,index.original.gene]),]
@@ -33,14 +33,15 @@ Map_Data_To_Unifying_Gene_Name <- function(df, database.name){
   # get gene symbol names
   gene.symbol.name <- gene.dict$hgnc_symbol[match(rownames(df), gene.dict[,index.original.gene])]
 
+
+
   if (sum(duplicated(gene.symbol.name)) == 0){
     print("No need for aggregation")
     rownames(df) <- gene.symbol.name
     return(df)
   } else{
-    df.add.one.col <- cbind(df, gene.symbol.name)
+    df.add.one.col <- cbind.data.frame(df, gene.symbol.name)
     colnames(df.add.one.col)[ncol(df.add.one.col)] <- "GeneID"
-    # make df
     df.add.one.col <- as.tibble(df.add.one.col)
     tmp <- df.add.one.col %>% group_by(GeneID) %>% summarise_all(mean)
     tmp <- as.data.frame(tmp)

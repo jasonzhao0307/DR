@@ -6,10 +6,12 @@ require(stringr)
 
 
 Get_CCLE_Name_Dict <- function(gene.name){
-
-  for (i in 1:length(gene.name)){
-   gene.name[i] <- str_match(gene.name[i], "(.+)\\.")[2]
+  if (grepl("\\.", gene.name[1])){
+    for (i in 1:length(gene.name)){
+     gene.name[i] <- str_match(gene.name[i], "(.+)\\.")[2]
+    }
   }
+
   dict.output <- Get_Gene_Mapping_Dict("ensembl_gene_id", gene.name)
   return(dict.output)
 
