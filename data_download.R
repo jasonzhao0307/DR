@@ -1,6 +1,21 @@
 require(CePa)
 require(tidyverse)
 require(stringr)
+
+# gdac if cancer or normal tissue
+is_cancer <- function(sample){
+  s <- strsplit(as.character(sample),"-")[[1]][4]
+  if (grepl("01",s)){
+    return("cancer")
+  }
+  else if (grepl("11",s)) {
+    return("normal")
+  }
+  else {
+    return("other")
+  }
+}
+
 #download raw data from GDAC
 Download_GDAC <- function(tumor.name, path.to.folder){
   #STAD no rnaseq2
@@ -18,18 +33,23 @@ Download_GDAC <- function(tumor.name, path.to.folder){
       system(paste0('curl ', '-o ', path.to.folder, '/', tumor,  '.gdac.tar.gz ', url))
       system(paste0('tar -zxvf ', path.to.folder, '/', tumor, '.gdac.tar.gz', ' -C ', path.to.folder))
     }
-
-    df.tmp <- read.table(paste0(path.to.folder, '/gdac.broadinstitute.org_', tumor, '.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2016012800.0.0/', tumor, '.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt'), stringsAsFactors = F, sep = "\t", header = T, row.names = 1)
-    colnames(df.tmp) <- gsub("\\.", "-", colnames(df.tmp))
-    df.tmp <- df.tmp[-1,seq(1,ncol(df.tmp),3)]
-    df.tmp.numeric <- apply(df.tmp, 2, as.numeric)
-    rownames(df.tmp.numeric) <- rownames(df.tmp)
-    gdac.list[[paste0(tumor)]] <- df.tmp.numeric
+    
+    #df.tmp <- read.table(paste0(path.to.folder, '/gdac.broadinstitute.org_', tumor, '.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2016012800.0.0/', tumor, '.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt'), stringsAsFactors = F, sep = "\t", header = T, row.names = 1)
+    file <- paste0(path.to.folder, '/gdac.broadinstitute.org_', tumor, '.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2016012800.0.0/', tumor, '.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt')
+    gdac.names <- read.csv(file,sep='\t', nrow=1, check.names=F, header = F, stringsAsFactors = F)
+    gdac.names <- gdac.names[seq(2, length(gdac.names), 3)]
+    # create metadata df with samples and conditions
+    gdac.metadata <- data.frame("sample" = as.character(gdac.names),"condition"=sapply(gdac.names,is_cancer), stringsAsFactors = F,row.names = seq(1,length(gdac.names)))
+    # get expression table
+    gdac.data <- read.csv(file,sep='\t', skip=1, header = T, row.names = 1)
+    gdac.data <- gdac.data[ , grepl( "raw_count" , names( gdac.data ) ) ]
+    colnames(gdac.data) <- gdac.names
+    gdac.list[[paste0(tumor)]] <- list(metadata = gdac.metadata, exp = gdac.data)
   }
   if (length(gdac.list) == 1){
     return(gdac.list[[1]])
   } else{
-  return(gdac.list)
+    return(gdac.list)
   }
 }
 
@@ -42,7 +62,7 @@ Download_GEO <- function(geo.accs, path.to.folder){
     if (!file.exists(path.to.folder)){
       dir.create(path.to.folder)
     }
-
+    
     if (!file.exists(paste0(path.to.folder, "/", geo_acc, '.txt'))){
       system(paste('curl ', url, ' -o ', path.to.folder, '/', geo_acc, '.txt.gz', sep = ""))
       system(paste('gunzip ', path.to.folder, '/', geo_acc, '.txt.gz', sep = ""))
@@ -53,7 +73,7 @@ Download_GEO <- function(geo.accs, path.to.folder){
   if (length(geo.list) == 1){
     return(geo.list[[1]])
   } else{
-  return(geo.list)
+    return(geo.list)
   }
 }
 
@@ -61,11 +81,11 @@ Download_GEO <- function(geo.accs, path.to.folder){
 #download raw data from CCLE RPKM
 Download_CCLE_RPKM <- function(path.to.folder){
   url = 'https://data.broadinstitute.org/ccle/CCLE_RNAseq_081117.rpkm.gct'
-
+  
   if (!file.exists(path.to.folder)){
-      dir.create(path.to.folder)
+    dir.create(path.to.folder)
   }
-
+  
   if (!file.exists(paste0(path.to.folder, "/ccle_rpkm.gct"))){
     system(paste('curl ', url, ' -o ', path.to.folder, '/ccle_rpkm.gct', sep = ""))
   }
@@ -73,7 +93,7 @@ Download_CCLE_RPKM <- function(path.to.folder){
   print("read in finished!")
   rowname.vec <- rownames(df.tmp)
   for (i in 1:length(rowname.vec)){
-   rowname.vec[i] <- str_match(rowname.vec[i], "(.+)\\.")[2]
+    rowname.vec[i] <- str_match(rowname.vec[i], "(.+)\\.")[2]
   }
   rownames(df.tmp) <- rowname.vec
   return(df.tmp)
@@ -85,12 +105,12 @@ Download_CCLE_RPKM <- function(path.to.folder){
 Download_CCLE_Metadata <- function(path.to.folder){
   url = 'https://data.broadinstitute.org/ccle_legacy_data/cell_line_annotations/CCLE_sample_info_file_2012-10-18.txt'
   if (!file.exists(path.to.folder)){
-      dir.create(path.to.folder)
+    dir.create(path.to.folder)
   }
   if (!file.exists(paste0(path.to.folder, "/ccle_annotation.txt"))){
     system(paste('curl ', url, ' -o ', path.to.folder, '/ccle_annotation.txt', sep = ""))
   }
-
+  
   df.tmp <- read.table(paste0(path.to.folder, "/ccle_annotation.txt"), stringsAsFactors = F, sep = "\t", header = T, row.names = 1)
   return(df.tmp)
 }
