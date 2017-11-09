@@ -30,12 +30,7 @@ df.ccle.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.ccle, database.name = "
 df.gdac.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.gdac, database.name = "GDAC")
 
 
-tmp <- cbind.data.frame(df, gene.symbol.name)
-
-
-# toy example
-tmp <- tibble(a = c(1,2,3,4,5,6), b = c(1,1,2,2,3,3), c = c(1,2,3,4,5,6))
-
+tmp <- Get_GDAC_Name_Dict(rownames(df.gdac))
 
 ```
 

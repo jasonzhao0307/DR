@@ -100,8 +100,8 @@ label.vec <- c(rep("cancer", length(sample.name.cancer)), rep("control", length(
 # CCLE
 
 ```{r}
-ccle.raw <- read.gct("data/CCLE_RNAseq_081117.rpkm.gct")
-ccle.hcc.name <- read.table("data/ccle_name_hcc.txt", stringsAsFactors = FALSE, sep = "\t")
+ccle.raw <- read.gct("../data/CCLE_RNAseq_081117.rpkm.gct")
+ccle.hcc.name <- read.table("../data/ccle_name_hcc.txt", stringsAsFactors = FALSE, sep = "\t")
 ccle.hcc.name <- ccle.hcc.name$V1
 
 ccle.hcc <- ccle.raw[,which(colnames(ccle.raw) %in% ccle.hcc.name)]
@@ -187,8 +187,24 @@ for (i in 1:nrow(cor.hcc)){
 
 ## download random tissue samples from Expression Project for Oncology (expO)
 ```{r}
+## use
+geo_accs = c('GSE2109')
+
+for (geo_acc in geo_accs){
+  url = paste('ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE2nnn/', geo_acc, '/matrix/', geo_acc, '_series_matrix.txt.gz', sep="")
+  if (!file.exists("../data/expo")){
+    dir.create("../data/expo")
+  }
+  system(paste('curl ', url, ' -o ../data/expo/', geo_acc, '.txt.gz', sep = ""))
+  system(paste('gunzip ', ' ../data/expo/', geo_acc, '.txt.gz', sep = ""))
+}
 #read in data
-expo.data <- read.table("data/GSE2109_series_matrix.txt", stringsAsFactors = F, header = T, comment.char = "!", row.names = 1)
+expo.data <- read.table("../data/expo/GSE2109.txt", stringsAsFactors = F, header = T, comment.char = "!", row.names = 1)
+
+
+
+#read in data
+#expo.data <- read.table("../data/GSE2109_series_matrix.txt", stringsAsFactors = F, header = T, comment.char = "!", row.names = 1)
 
 # transform the name into entrez
 expo.name.entrez <- gene.name.ccle$entrezgene[match(rownames(expo.data), gene.name.ccle$affy_hg_u133_plus_2)]
@@ -196,7 +212,7 @@ expo.name.entrez <- gene.name.ccle$entrezgene[match(rownames(expo.data), gene.na
 # remove NA
 expo.data <- expo.data[!is.na(expo.name.entrez),]
 tmp.rowname <- expo.name.entrez[!is.na(expo.name.entrez)]
-rownames(expo.data) <- 
+rownames(expo.data) <-
 
 # take random 1k samples
 set.seed(10)
@@ -249,10 +265,54 @@ dds <- estimateSizeFactors(dds)
 dds <- DESeq(dds)
 res <- results(dds, contrast=c("condition","cancer","control"))
 res.ordered <- res[order(res$padj),]
-  
+
 ### Get deg
 deg.1em1 <- GetDEG(res.ordered, 1e-1)
 
 
 ```
 
+
+
+
+
+# compare the dictionary
+```{r}
+gpl.df <- read.csv("../data/gpl_names.csv", header = T)
+affy.id.overlap <- intersect(gpl.df$ID, gene.name.ccle$affy_hg_u133_plus_2)
+
+gene.name.ccle.overlap <- as.tibble(gene.name.ccle[which(gene.name.ccle$affy_hg_u133_plus_2 %in% affy.id.overlap),c(1,4)])
+
+
+gene.name.ccle.unique <- gene.name.ccle.overlap %>% group_by(affy_hg_u133_plus_2) %>% summarise(count = n()) %>% filter(count == 1)
+
+gene.name.ccle.overlap <- as.tibble(gene.name.ccle.overlap[which(gene.name.ccle.overlap$affy_hg_u133_plus_2 %in% gene.name.ccle.unique$affy_hg_u133_plus_2),])
+gpl.df.overlap <- as.tibble(gpl.df[which(gpl.df$ID %in% gene.name.ccle.unique$affy_hg_u133_plus_2),])
+
+#remove the NAs
+gene.name.ccle.overlap <- gene.name.ccle.overlap %>% filter(!is.na(entrezgene))
+gpl.df.overlap <- gpl.df.overlap[which(gpl.df.overlap$ID %in% gene.name.ccle.overlap$affy_hg_u133_plus_2),]
+
+# reorder the two df
+gene.name.ccle.overlap <- gene.name.ccle.overlap %>% arrange(affy_hg_u133_plus_2)
+gpl.df.overlap<- gpl.df.overlap %>% arrange(ID)
+
+# remove the "///" in gpl
+gpl.df.overlap <- gpl.df.overlap[!is.na(as.numeric(as.character(gpl.df.overlap$GeneID))),]
+gene.name.ccle.overlap <- gene.name.ccle.overlap[which(gene.name.ccle.overlap$affy_hg_u133_plus_2 %in% gpl.df.overlap$ID),]
+
+# reorder the two df
+gene.name.ccle.overlap <- gene.name.ccle.overlap %>% arrange(affy_hg_u133_plus_2)
+gpl.df.overlap<- gpl.df.overlap %>% arrange(ID)
+
+# make numeric
+gpl.df.overlap$GeneID <- as.numeric(as.character(gpl.df.overlap$GeneID))
+
+
+
+# check if the dict is correct
+sum(gene.name.ccle.overlap$entrezgene == gpl.df.overlap$GeneID)
+
+
+
+```

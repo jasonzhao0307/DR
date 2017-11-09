@@ -15,14 +15,23 @@ Map_Data_To_Unifying_Gene_Name <- function(df, database.name){
   } else if (database.name == "GDAC") {
     gene.dict <- Get_GDAC_Name_Dict(row.names(df))
     gene.name <- "entrezgene"
+
   } else{
     stop(paste0("Please use the name from the list: ", paste(database.name.pool, collapse = ",")))
   }
+
+
 
   gene.dict <- data.frame(apply(gene.dict, 2, as.character), stringsAsFactors = FALSE)
 
   # index of the original gene id
   index.original.gene <- which(colnames(gene.dict) == gene.name)
+
+  if (database.name == "GDAC"){
+    rownames(df) <- gene.dict[,index.original.gene]
+  }
+
+
   # remove the rows with gene symbol empty
   gene.dict <- gene.dict[which(gene.dict$hgnc_symbol != "" & gene.dict$hgnc_symbol != "?"),]
   #print(head(gene.dict))
