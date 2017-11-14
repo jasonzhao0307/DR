@@ -33,7 +33,7 @@ Download_GDAC <- function(tumor.name, path.to.folder){
       system(paste0('curl ', '-o ', path.to.folder, '/', tumor,  '.gdac.tar.gz ', url))
       system(paste0('tar -zxvf ', path.to.folder, '/', tumor, '.gdac.tar.gz', ' -C ', path.to.folder))
     }
-    
+
     #df.tmp <- read.table(paste0(path.to.folder, '/gdac.broadinstitute.org_', tumor, '.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2016012800.0.0/', tumor, '.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt'), stringsAsFactors = F, sep = "\t", header = T, row.names = 1)
     file <- paste0(path.to.folder, '/gdac.broadinstitute.org_', tumor, '.Merge_rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.Level_3.2016012800.0.0/', tumor, '.rnaseqv2__illuminahiseq_rnaseqv2__unc_edu__Level_3__RSEM_genes__data.data.txt')
     gdac.names <- read.csv(file,sep='\t', nrow=1, check.names=F, header = F, stringsAsFactors = F)
@@ -42,7 +42,7 @@ Download_GDAC <- function(tumor.name, path.to.folder){
     gdac.metadata <- data.frame("sample" = as.character(gdac.names),"condition"=sapply(gdac.names,is_cancer), stringsAsFactors = F,row.names = seq(1,length(gdac.names)))
     # get expression table
     gdac.data <- read.csv(file,sep='\t', skip=1, header = T, row.names = 1)
-    gdac.data <- gdac.data[ , grepl( "raw_count" , names( gdac.data ) ) ]
+    gdac.data <- gdac.data[ , grepl( "scaled_estimate" , names( gdac.data ) ) ]
     colnames(gdac.data) <- gdac.names
     gdac.list[[paste0(tumor)]] <- list(metadata = gdac.metadata, exp = gdac.data)
   }
@@ -57,12 +57,12 @@ Download_GDAC <- function(tumor.name, path.to.folder){
 #affy
 Download_GEO <- function(geo.accs, path.to.folder){
   geo.list <- list()
-  for (geo_acc in geo_accs){
+  for (geo_acc in geo.accs){
     url = paste('ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE2nnn/', geo_acc, '/matrix/', geo_acc, '_series_matrix.txt.gz', sep="")
     if (!file.exists(path.to.folder)){
       dir.create(path.to.folder)
     }
-    
+
     if (!file.exists(paste0(path.to.folder, "/", geo_acc, '.txt'))){
       system(paste('curl ', url, ' -o ', path.to.folder, '/', geo_acc, '.txt.gz', sep = ""))
       system(paste('gunzip ', path.to.folder, '/', geo_acc, '.txt.gz', sep = ""))
@@ -81,11 +81,11 @@ Download_GEO <- function(geo.accs, path.to.folder){
 #download raw data from CCLE RPKM
 Download_CCLE_RPKM <- function(path.to.folder){
   url = 'https://data.broadinstitute.org/ccle/CCLE_RNAseq_081117.rpkm.gct'
-  
+
   if (!file.exists(path.to.folder)){
     dir.create(path.to.folder)
   }
-  
+
   if (!file.exists(paste0(path.to.folder, "/ccle_rpkm.gct"))){
     system(paste('curl ', url, ' -o ', path.to.folder, '/ccle_rpkm.gct', sep = ""))
   }
@@ -110,7 +110,7 @@ Download_CCLE_Metadata <- function(path.to.folder){
   if (!file.exists(paste0(path.to.folder, "/ccle_annotation.txt"))){
     system(paste('curl ', url, ' -o ', path.to.folder, '/ccle_annotation.txt', sep = ""))
   }
-  
+
   df.tmp <- read.table(paste0(path.to.folder, "/ccle_annotation.txt"), stringsAsFactors = F, sep = "\t", header = T, row.names = 1)
   return(df.tmp)
 }

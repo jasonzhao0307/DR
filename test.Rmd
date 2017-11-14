@@ -9,6 +9,24 @@ load("../DR.RData")
 
 # save
 save.image("../DR.RData")
+
+
+
+
+
+# load data from disk
+load("~/Google Drive File Stream/Team Drives/Startup/bin_chen/data/df.gdac.mapped.rds")
+load("~/Google Drive File Stream/Team Drives/Startup/bin_chen/data/df.ccle.mapped.Rda")
+load("~/Google Drive File Stream/Team Drives/Startup/bin_chen/data/df.ccle.metadata.Rda")
+load("~/Google Drive File Stream/Team Drives/Startup/bin_chen/data/df.expo.mapped.Rda")
+load("~/Google Drive File Stream/Team Drives/Startup/bin_chen/data/df.gdac.metadata.Rda")
+
+
+
+# process
+df.gdac.mapped <- df.gdac.mapped[,-1]
+df.expo.mapped <- df.expo.mapped[,-1]
+
 ```
 
 
@@ -30,7 +48,79 @@ df.ccle.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.ccle, database.name = "
 df.gdac.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.gdac, database.name = "GDAC")
 
 
-tmp <- Get_GDAC_Name_Dict(rownames(df.gdac))
 
 ```
 
+
+
+
+
+
+```{r}
+
+
+### Some samples don't have metadata??????
+
+df.ccle.new <- df.ccle.mapped[,which(colnames(df.ccle.mapped) %in% rownames(df.ccle.metadata))]
+df.ccle.metadata.new <- df.ccle.metadata[which(rownames(df.ccle.metadata) %in% colnames(df.ccle.new)),]
+
+
+
+
+
+# random 1k sampls from expo
+set.seed(20)
+df.expo.random.1k <- df.expo.mapped[,sample(1:ncol(df.expo.mapped), 1000)]
+
+# IQR
+df.ccle.new <- df.ccle.new[order(-apply(as.matrix(df.ccle.new), 1, IQR)),]
+
+# top 5K variable genes based on IQR
+gene.top5k <- rownames(df.ccle.new)[1:5000]
+gene.top5k.overlap <- intersect(gene.top5k, rownames(df.expo.mapped))
+gene.top5k.overlap <- intersect(gene.top5k.overlap, rownames(df.gdac.mapped))
+
+
+# ccle. HCC
+df.ccle.hcc.top5k <- df.ccle.new[gene.top5k.overlap,which(df.ccle.metadata.new$Site.Primary == "liver" & df.ccle.metadata.new$Histology == "carcinoma")]
+df.ccle.other.top5k <- df.ccle.new[gene.top5k.overlap,which(!(df.ccle.metadata.new$Site.Primary == "liver" & df.ccle.metadata.new$Histology == "carcinoma"))]
+
+
+
+###### EXPO
+
+#cor between EXPO and CCLE
+
+cor.expo.hcc <- cor(df.expo.random.1k[gene.top5k.overlap,], df.ccle.hcc.top5k, method = "spearman")
+cor.expo.other <- cor(df.expo.random.1k[gene.top5k.overlap,], df.ccle.other.top5k, method = "spearman")
+
+# calculate the p-value
+pvalue.vec.expo <- c()
+for (i in 1:nrow(cor.expo.hcc)){
+  pvalue.vec.expo[i] <- (wilcox.test(cor.expo.hcc[i,], cor.expo.other[i,]))$p.value
+}
+
+# cut-off
+pvalue.cutoff <- sort(pvalue.vec.expo, decreasing = F)[50]
+
+
+
+####### GDAC
+
+#cor between GDAC and CCLE
+cor.gdac.hcc <- cor(df.gdac.mapped[gene.top5k.overlap,], df.ccle.hcc.top5k, method = "spearman")
+cor.gdac.other <- cor(df.gdac.mapped[gene.top5k.overlap,], df.ccle.other.top5k, method = "spearman")
+
+# calculate the p-value
+pvalue.vec <- c()
+for (i in 1:nrow(cor.gdac.hcc)){
+  pvalue.vec[i] <- (wilcox.test(cor.gdac.hcc[i,], cor.gdac.other[i,]))$p.value
+}
+
+
+# choose the samples that have smaller p-value than pvalue.cutoff
+
+
+
+
+```
