@@ -27,6 +27,12 @@ load("~/Google Drive File Stream/Team Drives/Startup/bin_chen/data/df.gdac.metad
 df.gdac.mapped <- df.gdac.mapped[,-1]
 df.expo.mapped <- df.expo.mapped[,-1]
 
+
+# load gdac in RSEM
+load("~/Google Drive File Stream/Team Drives/Startup/bin_chen/data/df.gdac.mapped.Rda")
+df.gdac.mapped <- df.gdac.mapped[,-1]
+
+
 ```
 
 
@@ -38,14 +44,26 @@ list.df.gdac <- Download_GDAC(tumor.name = "LIHC", path.to.folder = "~/Desktop")
 df.gdac.metadata <- list.df.gdac$metadata
 df.gdac <- list.df.gdac$exp
 df.expo <- Download_GEO(geo.accs = 'GSE2109', path.to.folder = "~/Desktop")
-df.ccle <- Download_CCLE_RPKM(path.to.folder = "~/Desktop")
+df.ccle <- Download_CCLE_RPKM(path.to.folder = "../data/")
 df.ccle.metadata <- Download_CCLE_Metadata(path.to.folder = "~/Desktop")
+
+
+# get only gene coding genes for ccle
+source("Get_Gene_Mapping_Dict.R")
+ccle.gene.dict <- Get_CCLE_Name_Dict(rownames(df.ccle))
+ccle.gene.dict <- ccle.gene.dict[!duplicated(ccle.gene.dict$ensembl_gene_id),]
+ccle.coding.gene.ensemble.name <- ccle.gene.dict$ensembl_gene_id[(ccle.gene.dict$gene_biotype == "protein_coding")]
+df.ccle <- df.ccle[which(rownames(df.ccle) %in% ccle.coding.gene.ensemble.name),]
+
+
 
 # map and aggregate
 source("data_combining.R")
 df.expo.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.expo, database.name = "EXPO")
 df.ccle.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.ccle, database.name = "CCLE")
 df.gdac.mapped <- Map_Data_To_Unifying_Gene_Name(df = df.gdac, database.name = "GDAC")
+
+
 
 
 
@@ -97,7 +115,7 @@ cor.expo.other <- cor(df.expo.random.1k[gene.top5k.overlap,], df.ccle.other.top5
 # calculate the p-value
 pvalue.vec.expo <- c()
 for (i in 1:nrow(cor.expo.hcc)){
-  pvalue.vec.expo[i] <- (wilcox.test(cor.expo.hcc[i,], cor.expo.other[i,]))$p.value
+  pvalue.vec.expo[i] <- (wilcox.test(cor.expo.hcc[i,], cor.expo.other[i,], alternative = "greater"))$p.value
 }
 
 # cut-off
@@ -114,13 +132,13 @@ cor.gdac.other <- cor(df.gdac.mapped[gene.top5k.overlap,], df.ccle.other.top5k, 
 # calculate the p-value
 pvalue.vec <- c()
 for (i in 1:nrow(cor.gdac.hcc)){
-  pvalue.vec[i] <- (wilcox.test(cor.gdac.hcc[i,], cor.gdac.other[i,]))$p.value
+  pvalue.vec[i] <- (wilcox.test(cor.gdac.hcc[i,], cor.gdac.other[i,], alternative = "greater"))$p.value
 }
 
 
 # choose the samples that have smaller p-value than pvalue.cutoff
 
-
+sum(pvalue.vec > pvalue.cutoff)
 
 
 ```

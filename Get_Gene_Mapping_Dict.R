@@ -38,12 +38,12 @@ Get_EXPO_Name_Dict <- function(gene.name){
 
 # get dictionary for mapping
 Get_Gene_Mapping_Dict <- function(filter, gene.name){
-  filter.pool <- c("entrezgene", "ensembl_gene_id", "hgnc_symbol", "affy_hg_u133_plus_2")
+  filter.pool <- c("entrezgene", "ensembl_gene_id", "hgnc_symbol", "affy_hg_u133_plus_2", "gene_biotype", "transcript_biotype")
   if (!filter %in% filter.pool){
     stop(paste0("Please use the name from the list: ", paste(filter.pool, collapse = ",")))
   }
   ensembl = useMart("ensembl", dataset = "hsapiens_gene_ensembl")
-  name.dict <- getBM(attributes = c("entrezgene", "ensembl_gene_id", "hgnc_symbol", "affy_hg_u133_plus_2"), filters = filter, values = gene.name, mart=ensembl)
+  name.dict <- getBM(attributes = c("entrezgene", "ensembl_gene_id", "hgnc_symbol", "affy_hg_u133_plus_2", "gene_biotype", "transcript_biotype"), filters = filter, values = gene.name, mart=ensembl)
   #name.dict <- apply(name.dict, 2, as.character)
   return(name.dict)
 }
